@@ -4,6 +4,8 @@
 ---
 ### Added
 - Changelog (#4)
+- Clippy workflow (#6)
+- Publish workflow (#7)
 
 ### Improved
 - Crate-wide documentation (#5)
