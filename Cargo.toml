@@ -7,7 +7,7 @@ authors = [ "Herman A. Gohn" ]
 
 license = "MIT OR Apache-2.0"
 description = "Dynamically allocated ungrowable collections."
-repository = "github.com/gohermgo/fixed-collections"
+repository = "https://github.com/gohermgo/fixed-collections"
 readme = true
 
 keywords = [ "array", "contiguous", "buffer" ]
