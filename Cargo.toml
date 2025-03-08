@@ -1,13 +1,14 @@
 [package]
 name = "fixed-collections"
-description = "Dynamically allocated ungrowable collections."
 version = "0.1.89"
 edition = "2024"
 
-license = "MIT OR Apache-2.0"
-readme = true
-
 authors = [ "Herman A. Gohn" ]
+
+license = "MIT OR Apache-2.0"
+description = "Dynamically allocated ungrowable collections."
+repository = "github.com/gohermgo/fixed-collections"
+readme = true
 
 keywords = [ "array", "contiguous", "buffer" ]
 categories = [ "no-std", "data-structures", "embedded", "development-tools::ffi" ]
