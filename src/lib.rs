@@ -6,9 +6,15 @@ use core::ops::{Index, IndexMut};
 use core::ptr::{NonNull, slice_from_raw_parts_mut};
 use core::slice::{Iter, IterMut};
 
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::alloc::{alloc, dealloc, handle_alloc_error};
+
+#[cfg(feature = "std")]
 use std::alloc::{alloc, dealloc, handle_alloc_error};
 
-use num_traits::Zero;
+// use num_traits::Zero;
 
 #[derive(Debug)]
 pub struct ArrayPtr<T>(NonNull<[T]>);
@@ -78,9 +84,10 @@ impl<T> ArrayPtr<MaybeUninit<T>> {
         unsafe { transmute(self) }
     }
 }
+
 impl<T> ArrayPtr<T>
 where
-    T: Zero,
+    T: num_traits::Zero,
 {
     pub fn new_zeroed(count: usize) -> ArrayPtr<T> {
         let mut arr = ArrayPtr::new_uninit(count);
@@ -224,9 +231,10 @@ impl<T> RingPtr<MaybeUninit<T>> {
         unsafe { transmute(self) }
     }
 }
+#[cfg(feature = "num-traits")]
 impl<T> RingPtr<T>
 where
-    T: Zero,
+    T: num_traits::Zero,
 {
     pub fn new_zeroed(count: usize) -> RingPtr<T> {
         let mut arr = RingPtr::new_uninit(count);
@@ -338,13 +346,16 @@ impl<T> From<ArrayPtr<T>> for CircularBuffer<T> {
         }
     }
 }
+#[cfg(feature = "num-traits")]
 impl<T> CircularBuffer<T> {
     pub fn new_zeroed(count: usize) -> CircularBuffer<T>
     where
-        T: Zero,
+        T: num_traits::Zero,
     {
         ArrayPtr::new_zeroed(count).into()
     }
+}
+impl<T> CircularBuffer<T> {
     pub fn new_default(count: usize) -> CircularBuffer<T>
     where
         T: Default,
