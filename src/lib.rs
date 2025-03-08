@@ -552,3 +552,20 @@ impl<T> CircularBuffer<num_complex::Complex<T>> {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod array_ptr {
+        use super::*;
+
+        #[cfg(feature = "num-traits")]
+        #[test]
+        fn zero_means_zero() {
+            let arr: ArrayPtr<u32> = ArrayPtr::new_zeroed(10);
+            for elt in arr.iter() {
+                assert_eq!(elt, &0);
+            }
+        }
+    }
+}
