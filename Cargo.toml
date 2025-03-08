@@ -7,7 +7,7 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 readme = true
 
-author = "Herman Gohn"
+authors = [ "Herman A. Gohn" ]
 
 keywords = [ "array", "contiguous", "buffer" ]
 categories = [ "no-std", "data-structures", "embedded", "development-tools::ffi" ]
