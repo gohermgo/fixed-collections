@@ -5,6 +5,10 @@
 ### Added
 - Changelog
 
+### Improved
+- Crate-wide documentation
+- Safety-guards
+
 ## 0.1.89 - 2025-03-08
 ---
 ### Added
