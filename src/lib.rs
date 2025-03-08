@@ -16,6 +16,7 @@ use std::alloc::{alloc, dealloc, handle_alloc_error};
 
 // use num_traits::Zero;
 
+/// A dynamically allocated array of `T`
 #[derive(Debug)]
 pub struct ArrayPtr<T>(NonNull<[T]>);
 impl<T> Drop for ArrayPtr<T> {
@@ -24,8 +25,6 @@ impl<T> Drop for ArrayPtr<T> {
         unsafe { dealloc(self.0.as_ptr().cast(), layout) };
     }
 }
-unsafe impl<T> Send for ArrayPtr<T> {}
-unsafe impl<T> Sync for ArrayPtr<T> {}
 impl<T> Index<usize> for ArrayPtr<T> {
     type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
@@ -40,11 +39,19 @@ impl<T> IndexMut<usize> for ArrayPtr<T> {
     }
 }
 impl<T> ArrayPtr<T> {
+    /// Allocate a new [`ArrayPtr`]`<T>` without initializing the memory
+    ///
+    /// The number of elements is given by the input parameter `count`
     pub fn new_uninit(count: usize) -> ArrayPtr<MaybeUninit<T>> {
+        // Since the collection is ungrowable, this is not accepted
+        debug_assert!(
+            count != 0,
+            "Tried to initialize an ArrayPtr with zero elements!"
+        );
         let layout = Layout::array::<T>(count).expect("A sane layout");
 
+        // SAFETY: We handle the allocation error below, and the layout should be sane
         let ptr = unsafe { alloc(layout) } as *mut MaybeUninit<T>;
-
         if ptr.is_null() {
             handle_alloc_error(layout);
         }
@@ -67,9 +74,22 @@ impl<T> ArrayPtr<T> {
         }
         self[bound] = fst;
     }
+    /// Create a new [`ArrayPtr`]`<T>` from a pointer an an element-count
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the pointer is non-null,
+    /// and points to the number of elements specified.
     pub fn from_raw_parts(data: *mut T, len: usize) -> ArrayPtr<T> {
+        // TODO: Make this function unsafe (on next minor version bump)
+
         let ptr = core::ptr::slice_from_raw_parts_mut(data, len);
-        assert!(!ptr.is_null());
+        debug_assert!(
+            !ptr.is_null(),
+            "Tried to make an ArrayPtr from a null pointer!"
+        );
+
+        // SAFETY: We asserted above
         let inner = unsafe { NonNull::new_unchecked(ptr) };
         ArrayPtr(inner)
     }
@@ -85,10 +105,14 @@ impl<T> ArrayPtr<MaybeUninit<T>> {
     }
 }
 
+#[cfg(feature = "num-traits")]
 impl<T> ArrayPtr<T>
 where
     T: num_traits::Zero,
 {
+    /// Create a new [`ArrayPtr`]`<T>` by initializing it with `T`'s [`Zero`](num_traits::Zero) implementation.
+    ///
+    /// This function is feature-gated behind the `num-traits` feature.
     pub fn new_zeroed(count: usize) -> ArrayPtr<T> {
         let mut arr = ArrayPtr::new_uninit(count);
         for val in arr.iter_mut() {
@@ -101,6 +125,7 @@ impl<T> ArrayPtr<T>
 where
     T: Default,
 {
+    /// Create a new [`ArrayPtr`]`<T>` by initializing it with `T`'s [`Default`] implementation.
     pub fn new_default(count: usize) -> ArrayPtr<T> {
         let mut arr = ArrayPtr::new_uninit(count);
         for val in arr.iter_mut() {
@@ -122,33 +147,44 @@ impl<T> AsMut<[T]> for ArrayPtr<T> {
     }
 }
 impl<T> ArrayPtr<T> {
-    pub fn from_fn(count: usize, f: impl Fn(usize) -> T) -> ArrayPtr<T> {
+    /// Create a new [`ArrayPtr`]`<T>` from a provided closure and element-count
+    ///
+    /// The closure will be invoked as an index-mapping from 0 up to the specified element-count.
+    pub fn from_fn(count: usize, idx_map: impl Fn(usize) -> T) -> ArrayPtr<T> {
         let mut buf = ArrayPtr::new_uninit(count);
         for (idx, elt) in buf.iter_mut().enumerate() {
-            elt.write(f(idx));
+            elt.write(idx_map(idx));
         }
         unsafe { buf.assume_init() }
     }
+    /// Returns [`true`] if the underlying [`ArrayPtr`]`<T>` is empty
+    ///
+    /// This should never happen.
     #[inline(always)]
     pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+    /// Returns the number of elements pointed to the [`ArrayPtr`]`<T>`
     #[inline(always)]
     pub const fn len(&self) -> usize {
         self.0.len()
     }
+    /// Returns a shared slice-reference to the underlying data
     #[inline(always)]
     pub fn as_slice(&self) -> &[T] {
         self.as_ref()
     }
+    /// Returns a mutable slice-reference to the underlying data
     #[inline(always)]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         self.as_mut()
     }
+    /// Returns an immutable iterator over underlying data
     #[inline(always)]
     pub fn iter(&self) -> Iter<'_, T> {
         self.as_slice().iter()
     }
+    /// Returns a mutable iterator over underlying data
     #[inline(always)]
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         self.as_mut_slice().iter_mut()
@@ -182,8 +218,6 @@ impl<T> Drop for RingPtr<T> {
     }
 }
 
-unsafe impl<T> Send for RingPtr<T> {}
-unsafe impl<T> Sync for RingPtr<T> {}
 impl<T> Index<usize> for RingPtr<T> {
     type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
@@ -256,7 +290,7 @@ where
         unsafe { arr.assume_init() }
     }
 }
-pub type Pair<T> = (T, T);
+
 impl<T> RingPtr<T> {
     #[inline(always)]
     fn at(&mut self, offset: usize) -> *mut T {
@@ -348,6 +382,9 @@ impl<T> From<ArrayPtr<T>> for CircularBuffer<T> {
 }
 #[cfg(feature = "num-traits")]
 impl<T> CircularBuffer<T> {
+    /// Create a new [`CircularBuffer`]`<T>` by initializing it with `T`'s [`Zero`](num_traits::Zero) implementation.
+    ///
+    /// This function is feature-gated behind the `num-traits` feature.
     pub fn new_zeroed(count: usize) -> CircularBuffer<T>
     where
         T: num_traits::Zero,
@@ -356,6 +393,7 @@ impl<T> CircularBuffer<T> {
     }
 }
 impl<T> CircularBuffer<T> {
+    /// Create a new [`CircularBuffer`]`<T>` by initializing it with `T`'s [`Default`] implementation.
     pub fn new_default(count: usize) -> CircularBuffer<T>
     where
         T: Default,
@@ -366,6 +404,7 @@ impl<T> CircularBuffer<T> {
     fn incremented_cursor(&self) -> usize {
         (self.cursor + 1) % (self.buffer.len())
     }
+    /// Returns what the previous cursor value would be
     fn decremented_cursor(&self) -> usize {
         if self.cursor == 0 {
             self.buffer.len() - 1
@@ -373,9 +412,11 @@ impl<T> CircularBuffer<T> {
             (self.cursor - 1) % (self.buffer.len())
         }
     }
-    pub fn current_as_ref(&self) -> &T {
+    /// Returns a shared reference to the current element
+    fn current_as_ref(&self) -> &T {
         unsafe { self.buffer.as_slice().get_unchecked(self.cursor) }
     }
+    /// Returns a mutable reference to the current element
     fn current_as_mut(&mut self) -> &mut T {
         unsafe { self.buffer.as_mut_slice().get_unchecked_mut(self.cursor) }
     }
@@ -390,6 +431,9 @@ impl<T> CircularBuffer<T> {
         let curr = replace(self.current_as_mut(), src);
         (prev, curr)
     }
+    /// The same as [`CircularBuffer::update_forwards`] but reverses
+    /// through the internal buffer
+    #[inline(always)]
     pub fn update_backwards(&mut self, src: T) -> (T, T)
     where
         T: Copy,
@@ -399,10 +443,12 @@ impl<T> CircularBuffer<T> {
         let curr = replace(self.current_as_mut(), src);
         (prev, curr)
     }
+    /// Set the [`CircularBuffer`]'s cursor to the specified value
     #[inline(always)]
     pub const fn set_cursor(&mut self, val: usize) {
         self.cursor = val;
     }
+    /// Set the [`CircularBuffer`]'s cursor to zero
     #[inline(always)]
     pub const fn reset_cursor(&mut self) {
         self.set_cursor(0);
@@ -412,15 +458,20 @@ impl<T> CircularBuffer<T> {
         self.buffer.is_empty()
     }
 
+    /// Returns the total element-count in this [`CircularBuffer`]
     #[inline(always)]
     pub const fn len(&self) -> usize {
         self.buffer.len()
     }
 
+    /// Returns the full data contained in this [`CircularBuffer`]
+    /// as a shared slice-reference
     #[inline(always)]
     pub fn as_slice(&self) -> &[T] {
         self.buffer.as_slice()
     }
+    /// Returns the full data contained in this [`CircularBuffer`]
+    /// as a mutable slice-reference
     #[inline(always)]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         self.buffer.as_mut_slice()
