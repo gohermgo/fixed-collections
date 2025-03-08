@@ -473,7 +473,7 @@ impl<T> CircularBuffer<num_complex::Complex<T>> {
     #[inline(always)]
     pub fn apply_hilbert_filter(&mut self)
     where
-        T: rustfft::FftNum + num_traits::NumCast + Zero,
+        T: rustfft::FftNum + num_traits::NumCast + num_traits::Zero,
         num_complex::Complex<T>: core::ops::MulAssign,
     {
         use num_complex::Complex;
@@ -481,9 +481,9 @@ impl<T> CircularBuffer<num_complex::Complex<T>> {
         let n = self.buffer.as_slice().len();
         for (i, elt) in self.buffer.iter_mut().enumerate().take(n) {
             let multiplier = match i {
-                0 => Complex::zero(),                                 // Zero DC
+                0 => <num_complex::Complex<T> as num_traits::Zero>::zero(), // Zero DC
                 i if i < n / 2 => Complex::new(T::zero(), -T::one()), // -i for positive frequencies
-                _ => Complex::zero(),                                 // Zero negative frequencies
+                _ => <num_complex::Complex<T> as num_traits::Zero>::zero(), // Zero negative frequencies
             };
             *elt *= multiplier;
         }
